@@ -1,0 +1,23 @@
+services:
+  docker-health-monitor:
+    image: ${DOCKERHUB_USERNAME:-xmer}/docker-health-monitor:latest
+    container_name: docker-health-monitor
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
+      - INCLUDE_PATTERNS=${INCLUDE_PATTERNS:-}
+      - EXCLUDE_PATTERNS=${EXCLUDE_PATTERNS:-}
+      - REQUIRED_LABELS=${REQUIRED_LABELS:-}
+      - LOG_TAIL_LINES=${LOG_TAIL_LINES:-10}
+      - LOKI_HOST=${LOKI_HOST:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - network
+
+networks:
+  network:
+    external: true

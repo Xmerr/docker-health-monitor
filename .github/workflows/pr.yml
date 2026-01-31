@@ -1,0 +1,130 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  notify-pr-opened:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    steps:
+      - name: Notify PR Opened
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/pr.opened" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "action": "opened",
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "pr_title": "${{ github.event.pull_request.title }}",
+              "pr_url": "${{ github.event.pull_request.html_url }}",
+              "author": "${{ github.event.pull_request.user.login }}"
+            }'
+
+  notify-pr-merged:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    steps:
+      - name: Notify PR Merged
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/pr.merged" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "action": "merged",
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "pr_title": "${{ github.event.pull_request.title }}",
+              "pr_url": "${{ github.event.pull_request.html_url }}",
+              "author": "${{ github.event.pull_request.user.login }}"
+            }'
+
+  notify-pr-closed:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed' && github.event.pull_request.merged == false
+    steps:
+      - name: Notify PR Closed
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/pr.closed" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "action": "closed",
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "pr_title": "${{ github.event.pull_request.title }}",
+              "pr_url": "${{ github.event.pull_request.html_url }}",
+              "author": "${{ github.event.pull_request.user.login }}"
+            }'
+
+  test-and-coverage:
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run linting
+        run: bun run lint
+
+      - name: Run tests with coverage
+        run: bun run test:coverage
+
+      - name: Build
+        run: bun run build
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/
+          retention-days: 30
+
+  notify-result:
+    runs-on: ubuntu-latest
+    needs: [test-and-coverage]
+    if: always() && github.event.action != 'closed'
+    steps:
+      - name: Notify CI Success
+        if: needs.test-and-coverage.result == 'success'
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.success" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+      - name: Notify CI Failure
+        if: needs.test-and-coverage.result != 'success'
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.failure" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'

@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/docker-health-monitor
+
+jobs:
+  test:
+    name: Test with Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run tests with coverage
+        run: bun run test:coverage
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          # Get commits since last tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)")
+          fi
+
+          # Write release notes
+          cat << EOF > release-notes.md
+          ## Docker Image
+
+          \`\`\`bash
+          docker pull ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+          \`\`\`
+
+          ## Changes
+
+          $COMMITS
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          generate_release_notes: true
+
+  notify-result:
+    runs-on: ubuntu-latest
+    needs: [test, build-and-push, release]
+    if: always()
+    steps:
+      - name: Notify Release Success
+        if: needs.release.result == 'success'
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.success" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "success",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "dockerImage": true
+            }'
+
+      - name: Notify Release Failure
+        if: needs.release.result != 'success'
+        run: |
+          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.failure" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repository": "${{ github.repository }}",
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "failure",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'

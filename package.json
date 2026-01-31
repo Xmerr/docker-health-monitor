@@ -1,0 +1,25 @@
+{
+	"name": "docker-health-monitor",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "tsc",
+		"lint": "biome check src/",
+		"lint:fix": "biome check --write src/",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"start": "bun run src/index.ts"
+	},
+	"dependencies": {
+		"@xmer/consumer-shared": "^1.0.1",
+		"dockerode": "^4.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/amqplib": "^0.10.8",
+		"@types/bun": "^1.2.4",
+		"@types/dockerode": "^3.3.0",
+		"typescript": "^5.7.3"
+	}
+}
