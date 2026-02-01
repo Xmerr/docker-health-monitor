@@ -167,7 +167,7 @@ All alert routing keys (`container.*`) are bound from `docker` exchange to `noti
 
 ## Container Filtering
 
-Default: Monitor containers with restart policy (`always`, `unless-stopped`, `on-failure`).
+Default: Monitor all running or restarting containers. (Note: Restart policy filtering was removed because `listContainers()` API doesn't return restart policy data.)
 
 Configurable via:
 - `INCLUDE_PATTERNS`: Glob patterns for container names to include

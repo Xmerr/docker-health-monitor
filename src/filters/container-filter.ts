@@ -30,8 +30,11 @@ export class ContainerFilter implements IContainerFilter {
 			return this.matchesAnyPattern(name, this.includePatterns);
 		}
 
-		// Default: monitor containers with restart policy
-		return this.hasRestartPolicy(container);
+		// Default: monitor all running containers
+		// Note: We can't check restart policy here because listContainers() doesn't
+		// return HostConfig.RestartPolicy - that requires container inspect
+		const state = container.State?.toLowerCase() ?? "";
+		return state === "running" || state === "restarting";
 	}
 
 	private getContainerName(container: Docker.ContainerInfo): string {
@@ -67,17 +70,5 @@ export class ContainerFilter implements IContainerFilter {
 			}
 		}
 		return true;
-	}
-
-	private hasRestartPolicy(container: Docker.ContainerInfo): boolean {
-		const hostConfig = container.HostConfig as
-			| { RestartPolicy?: { Name?: string } }
-			| undefined;
-		const restartPolicy = hostConfig?.RestartPolicy?.Name;
-		return (
-			restartPolicy === "always" ||
-			restartPolicy === "unless-stopped" ||
-			restartPolicy === "on-failure"
-		);
 	}
 }
