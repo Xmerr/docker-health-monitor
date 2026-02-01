@@ -182,8 +182,8 @@ describe("DockerPublisher", () => {
 				"topic",
 				{ durable: true },
 			);
-			// Should bind 5 routing keys
-			expect(mockChannel.bindExchange).toHaveBeenCalledTimes(5);
+			// Should bind 6 routing keys (5 alerts + status.report)
+			expect(mockChannel.bindExchange).toHaveBeenCalledTimes(6);
 		});
 
 		it("should not re-assert exchanges on subsequent publishes", async () => {

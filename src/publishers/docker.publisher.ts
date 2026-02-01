@@ -80,13 +80,14 @@ export class DockerPublisher implements IDockerPublisher {
 			durable: true,
 		});
 
-		// Bind docker exchange to notifications for container alerts
+		// Bind docker exchange to notifications for container alerts and status reports
 		const alertRoutingKeys = [
 			ROUTING_KEYS.unhealthy,
 			ROUTING_KEYS.died,
 			ROUTING_KEYS.restarting,
 			ROUTING_KEYS.oom_killed,
 			ROUTING_KEYS.recovered,
+			ROUTING_KEYS.status_report,
 		];
 
 		for (const routingKey of alertRoutingKeys) {

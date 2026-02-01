@@ -33,14 +33,11 @@ function createMockContainer(
 
 describe("ContainerFilter", () => {
 	describe("shouldMonitor with no config", () => {
-		it("should monitor container with restart policy always", () => {
+		it("should monitor running container", () => {
 			// Arrange
 			const filter = new ContainerFilter({});
 			const container = createMockContainer({
-				HostConfig: {
-					NetworkMode: "bridge",
-					RestartPolicy: { Name: "always", MaximumRetryCount: 0 },
-				},
+				State: "running",
 			});
 
 			// Act
@@ -50,14 +47,11 @@ describe("ContainerFilter", () => {
 			expect(result).toBe(true);
 		});
 
-		it("should monitor container with restart policy unless-stopped", () => {
+		it("should monitor restarting container", () => {
 			// Arrange
 			const filter = new ContainerFilter({});
 			const container = createMockContainer({
-				HostConfig: {
-					NetworkMode: "bridge",
-					RestartPolicy: { Name: "unless-stopped", MaximumRetryCount: 0 },
-				},
+				State: "restarting",
 			});
 
 			// Act
@@ -67,31 +61,25 @@ describe("ContainerFilter", () => {
 			expect(result).toBe(true);
 		});
 
-		it("should monitor container with restart policy on-failure", () => {
+		it("should not monitor exited container", () => {
 			// Arrange
 			const filter = new ContainerFilter({});
 			const container = createMockContainer({
-				HostConfig: {
-					NetworkMode: "bridge",
-					RestartPolicy: { Name: "on-failure", MaximumRetryCount: 3 },
-				},
+				State: "exited",
 			});
 
 			// Act
 			const result = filter.shouldMonitor(container);
 
 			// Assert
-			expect(result).toBe(true);
+			expect(result).toBe(false);
 		});
 
-		it("should not monitor container without restart policy", () => {
+		it("should not monitor paused container", () => {
 			// Arrange
 			const filter = new ContainerFilter({});
 			const container = createMockContainer({
-				HostConfig: {
-					NetworkMode: "bridge",
-					RestartPolicy: { Name: "no", MaximumRetryCount: 0 },
-				},
+				State: "paused",
 			});
 
 			// Act
