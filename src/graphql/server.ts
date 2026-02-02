@@ -1,9 +1,9 @@
+import { createServer } from "node:http";
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import type { ILogger } from "@xmer/consumer-shared";
 import { useServer } from "graphql-ws/lib/use/ws";
-import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import type { IHealthChecker } from "../types/index.js";
 import type { GraphQLContext } from "./resolvers.js";

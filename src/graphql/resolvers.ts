@@ -56,7 +56,8 @@ export const resolvers = {
 
 	Subscription: {
 		containerStatusChanged: {
-			subscribe: () => pubsub.asyncIterableIterator(EVENTS.CONTAINER_STATUS_CHANGED),
+			subscribe: () =>
+				pubsub.asyncIterableIterator(EVENTS.CONTAINER_STATUS_CHANGED),
 		},
 
 		containerAlert: {
