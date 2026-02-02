@@ -1,0 +1,8 @@
+[allowlist]
+description = "Project-specific allowlist for false positives"
+
+# Placeholder AMQP connection strings in docs
+fingerprints = [
+  "3690275b4e8beaaa7a46f00c5fc22615e338189d:README.md:amqp-connection-string:16",
+  "3690275b4e8beaaa7a46f00c5fc22615e338189d:README.md:amqp-connection-string:29",
+]

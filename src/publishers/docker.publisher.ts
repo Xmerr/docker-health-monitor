@@ -5,6 +5,7 @@ import type {
 	DockerPublisherOptions,
 	DockerStatusReport,
 	IDockerPublisher,
+	PubSubEmitter,
 } from "../types/index.js";
 
 const ROUTING_KEYS = {
@@ -16,11 +17,17 @@ const ROUTING_KEYS = {
 	status_report: "status.report",
 } as const;
 
+export const PUBSUB_EVENTS = {
+	CONTAINER_ALERT: "CONTAINER_ALERT",
+	CONTAINER_STATUS_CHANGED: "CONTAINER_STATUS_CHANGED",
+} as const;
+
 export class DockerPublisher implements IDockerPublisher {
 	private readonly channel: Channel;
 	private readonly exchange: string;
 	private readonly notificationsExchange: string;
 	private readonly logger: ILogger;
+	private readonly pubsub?: PubSubEmitter;
 	private exchangeAsserted = false;
 
 	constructor(options: DockerPublisherOptions) {
@@ -28,6 +35,7 @@ export class DockerPublisher implements IDockerPublisher {
 		this.exchange = options.exchange;
 		this.notificationsExchange = options.notificationsExchange;
 		this.logger = options.logger.child({ component: "DockerPublisher" });
+		this.pubsub = options.pubsub;
 	}
 
 	async publishAlert(alert: ContainerAlert): Promise<void> {
@@ -35,6 +43,13 @@ export class DockerPublisher implements IDockerPublisher {
 
 		const routingKey = ROUTING_KEYS[alert.event];
 		await this.publish(routingKey, alert as unknown as Record<string, unknown>);
+
+		// Emit to GraphQL subscriptions
+		if (this.pubsub) {
+			await this.pubsub.publish(PUBSUB_EVENTS.CONTAINER_ALERT, {
+				containerAlert: alert,
+			});
+		}
 
 		this.logger.info("Alert published", {
 			event: alert.event,

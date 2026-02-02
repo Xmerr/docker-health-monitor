@@ -80,6 +80,12 @@ export interface Config {
 	notificationsExchange: string;
 	triggerQueueName: string;
 	triggerRoutingKey: string;
+	graphqlPort: number;
+	graphqlWsPort: number;
+}
+
+export interface PubSubEmitter {
+	publish(event: string, payload: unknown): Promise<void>;
 }
 
 export interface DockerPublisherOptions {
@@ -87,6 +93,7 @@ export interface DockerPublisherOptions {
 	exchange: string;
 	notificationsExchange: string;
 	logger: ILogger;
+	pubsub?: PubSubEmitter;
 }
 
 export interface EventListenerOptions {

@@ -36,6 +36,9 @@ ENV NODE_ENV=production
 
 USER nodejs
 
+# GraphQL HTTP and WebSocket ports
+EXPOSE 4002 4003
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bun -e "process.exit(0)"
 

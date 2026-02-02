@@ -7,11 +7,13 @@ import Docker from "dockerode";
 import { createConfig } from "./config/config.js";
 import { TriggerConsumer } from "./consumers/trigger.consumer.js";
 import { ContainerFilter } from "./filters/container-filter.js";
+import { createGraphQLServer, pubsub } from "./graphql/index.js";
 import { DockerPublisher } from "./publishers/docker.publisher.js";
 import { EventListenerService } from "./services/event-listener.service.js";
 import { HealthCheckerService } from "./services/health-checker.service.js";
 import { LogFetcherService } from "./services/log-fetcher.service.js";
 import { ContainerStateStore } from "./state/container-state.store.js";
+import type { PubSubEmitter } from "./types/index.js";
 
 async function main(): Promise<void> {
 	const config = createConfig();
@@ -70,11 +72,19 @@ async function main(): Promise<void> {
 
 	const stateStore = new ContainerStateStore();
 
+	// Create PubSub emitter wrapper for GraphQL subscriptions
+	const pubsubEmitter: PubSubEmitter = {
+		publish: async (event: string, payload: unknown) => {
+			await pubsub.publish(event, payload);
+		},
+	};
+
 	const publisher = new DockerPublisher({
 		channel,
 		exchange: config.exchangeName,
 		notificationsExchange: config.notificationsExchange,
 		logger,
+		pubsub: pubsubEmitter,
 	});
 
 	const logFetcher = new LogFetcherService({
@@ -118,15 +128,26 @@ async function main(): Promise<void> {
 		healthChecker,
 	});
 
+	// Create GraphQL server
+	const graphqlServer = createGraphQLServer({
+		port: config.graphqlPort,
+		wsPort: config.graphqlWsPort,
+		healthChecker,
+		logger,
+	});
+
 	// Start services
 	await triggerConsumer.start();
 	await eventListener.start();
 	healthChecker.start();
+	await graphqlServer.start();
 
 	logger.info("docker-health-monitor is running", {
 		pollIntervalSeconds: config.pollIntervalSeconds,
 		includePatterns: config.includePatterns,
 		excludePatterns: config.excludePatterns,
+		graphqlPort: config.graphqlPort,
+		graphqlWsPort: config.graphqlWsPort,
 	});
 
 	// Graceful shutdown
@@ -136,6 +157,7 @@ async function main(): Promise<void> {
 		healthChecker.stop();
 		eventListener.stop();
 		await triggerConsumer.stop();
+		await graphqlServer.stop();
 
 		// Wait for in-flight messages
 		await new Promise((resolve) => setTimeout(resolve, 2000));

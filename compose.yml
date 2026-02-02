@@ -13,8 +13,13 @@ services:
       - LOG_TAIL_LINES=${LOG_TAIL_LINES:-10}
       - LOKI_HOST=${LOKI_HOST:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - GRAPHQL_PORT=${GRAPHQL_PORT:-4002}
+      - GRAPHQL_WS_PORT=${GRAPHQL_WS_PORT:-4003}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "${GRAPHQL_PORT:-4002}:4002"
+      - "${GRAPHQL_WS_PORT:-4003}:4003"
     networks:
       - network
 
