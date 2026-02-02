@@ -3,6 +3,7 @@ import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import type { ILogger } from "@xmer/consumer-shared";
+import type { Disposable } from "graphql-ws";
 import { useServer } from "graphql-ws/lib/use/ws";
 import { WebSocketServer } from "ws";
 import type { IHealthChecker } from "../types/index.js";
@@ -30,7 +31,8 @@ export function createGraphQLServer(
 
 	const schema = buildSubgraphSchema({
 		typeDefs,
-		resolvers,
+		// biome-ignore lint/suspicious/noExplicitAny: Apollo subgraph types are complex
+		resolvers: resolvers as any,
 	});
 
 	const apolloServer = new ApolloServer<GraphQLContext>({
@@ -43,7 +45,7 @@ export function createGraphQLServer(
 		path: "/graphql",
 	});
 
-	let serverCleanup: { dispose: () => Promise<void> };
+	let serverCleanup: Disposable;
 	let apolloUrl: string;
 
 	return {
@@ -61,7 +63,8 @@ export function createGraphQLServer(
 						graphqlLogger.debug("WebSocket client disconnected");
 					},
 				},
-				wsServer,
+				// biome-ignore lint/suspicious/noExplicitAny: ws types don't match graphql-ws expectations
+				wsServer as any,
 			);
 
 			await new Promise<void>((resolve) => {
