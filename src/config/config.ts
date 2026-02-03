@@ -24,6 +24,9 @@ export function createConfig(
 	const triggerQueueName = env.TRIGGER_QUEUE_NAME ?? "docker.trigger";
 	const triggerRoutingKey = env.TRIGGER_ROUTING_KEY ?? "trigger";
 
+	const graphqlPort = parsePositiveInt(env.GRAPHQL_PORT, 4002);
+	const graphqlWsPort = parsePositiveInt(env.GRAPHQL_WS_PORT, 4003);
+
 	return {
 		rabbitmqUrl,
 		dockerHost,
@@ -38,6 +41,8 @@ export function createConfig(
 		notificationsExchange,
 		triggerQueueName,
 		triggerRoutingKey,
+		graphqlPort,
+		graphqlWsPort,
 	};
 }
 
