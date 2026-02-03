@@ -12,6 +12,8 @@ Monitors Docker container health via the Docker API and publishes alerts to Rabb
 ```bash
 docker run -d \
   --name docker-health-monitor \
+  -p 4002:4002 \
+  -p 4003:4003 \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   -e RABBITMQ_URL=amqp://user:pass@host:5672 \
   xmer/docker-health-monitor:latest
@@ -25,6 +27,9 @@ services:
     image: xmer/docker-health-monitor:latest
     container_name: docker-health-monitor
     restart: unless-stopped
+    ports:
+      - "4002:4002"  # GraphQL HTTP
+      - "4003:4003"  # GraphQL WebSocket
     environment:
       - RABBITMQ_URL=amqp://user:pass@host:5672
       - POLL_INTERVAL_SECONDS=60
@@ -55,6 +60,8 @@ networks:
 | `LOG_TAIL_LINES` | No | `10` | Lines of logs to include in alerts |
 | `LOKI_HOST` | No | - | Grafana Loki endpoint |
 | `LOG_LEVEL` | No | `info` | Log level |
+| `GRAPHQL_PORT` | No | `4002` | GraphQL HTTP server port |
+| `GRAPHQL_WS_PORT` | No | `4003` | GraphQL WebSocket server port |
 
 ## Volumes
 
@@ -64,7 +71,82 @@ networks:
 
 ## Ports
 
-This service does not expose any ports. It communicates via RabbitMQ.
+| Port | Protocol | Description |
+|------|----------|-------------|
+| `4002` | HTTP | GraphQL API endpoint |
+| `4003` | WebSocket | GraphQL subscriptions (`/graphql`) |
+
+## GraphQL API
+
+The service exposes a GraphQL API for querying container status and subscribing to real-time events.
+
+**Endpoints:**
+- HTTP: `http://localhost:4002/graphql`
+- WebSocket: `ws://localhost:4003/graphql`
+
+### Queries
+
+```graphql
+# Get all monitored containers
+query {
+  containers {
+    id
+    name
+    image
+    status
+    uptimeSeconds
+    restartCount
+  }
+}
+
+# Get a specific container
+query {
+  container(id: "abc123") {
+    id
+    name
+    status
+  }
+}
+```
+
+### Subscriptions
+
+```graphql
+# Subscribe to container status changes
+subscription {
+  containerStatusChanged {
+    container {
+      id
+      name
+      status
+    }
+    previousStatus
+    timestamp
+  }
+}
+
+# Subscribe to container alerts
+subscription {
+  containerAlert {
+    containerId
+    containerName
+    image
+    event        # UNHEALTHY, DIED, RESTARTING, OOM_KILLED, RECOVERED
+    exitCode
+    restartCount
+    healthStatus
+    logsTail
+    timestamp
+  }
+}
+```
+
+### Types
+
+| Type | Values |
+|------|--------|
+| `ContainerStatus` | `RUNNING`, `HEALTHY`, `UNHEALTHY`, `EXITED`, `RESTARTING` |
+| `AlertEvent` | `UNHEALTHY`, `DIED`, `RESTARTING`, `OOM_KILLED`, `RECOVERED` |
 
 ## Monitoring Modes
 
