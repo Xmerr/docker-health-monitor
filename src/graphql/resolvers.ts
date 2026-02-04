@@ -54,6 +54,27 @@ export const resolvers = {
 		},
 	},
 
+	Mutation: {
+		refreshContainers: async (
+			_parent: unknown,
+			_args: unknown,
+			context: GraphQLContext,
+		) => {
+			try {
+				await context.healthChecker.pollContainers(true);
+				return {
+					success: true,
+					message: "Container refresh triggered successfully",
+				};
+			} catch (error) {
+				return {
+					success: false,
+					message: `Failed to refresh containers: ${(error as Error).message}`,
+				};
+			}
+		},
+	},
+
 	Subscription: {
 		containerStatusChanged: {
 			subscribe: () => pubsub.asyncIterator(EVENTS.CONTAINER_STATUS_CHANGED),

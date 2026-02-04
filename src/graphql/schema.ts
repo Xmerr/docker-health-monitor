@@ -16,6 +16,21 @@ export const typeDefs = gql`
     container(id: ID!): Container
   }
 
+  type Mutation {
+    """
+    Trigger a refresh of all container statuses from Docker
+    """
+    refreshContainers: RefreshResult!
+  }
+
+  """
+  Result of a refresh operation
+  """
+  type RefreshResult {
+    success: Boolean!
+    message: String
+  }
+
   type Subscription {
     """
     Subscribe to container status changes
