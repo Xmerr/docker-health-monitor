@@ -118,12 +118,27 @@ export class HealthCheckerService implements IHealthChecker {
 			}
 
 			const status = this.getContainerStatus(containerInfo);
-			const hostConfig = containerInfo.HostConfig as
-				| { RestartPolicy?: { MaximumRetryCount?: number } }
-				| undefined;
-			const restartCount = hostConfig?.RestartPolicy?.MaximumRetryCount ?? 0;
-			const createdAt = containerInfo.Created ?? Date.now() / 1000;
-			const uptimeSeconds = Math.floor(Date.now() / 1000 - createdAt);
+
+			// Inspect container to get accurate StartedAt time and RestartCount
+			let uptimeSeconds = 0;
+			let restartCount = 0;
+			try {
+				const container = this.docker.getContainer(containerInfo.Id);
+				const inspectInfo = await container.inspect();
+				restartCount = inspectInfo.RestartCount ?? 0;
+
+				// Use StartedAt for accurate uptime (not Created which is creation time)
+				const startedAt = inspectInfo.State?.StartedAt;
+				if (startedAt && startedAt !== "0001-01-01T00:00:00Z") {
+					const startTime = new Date(startedAt).getTime() / 1000;
+					uptimeSeconds = Math.floor(Date.now() / 1000 - startTime);
+				}
+			} catch (error) {
+				this.logger.warn("Failed to inspect container for uptime", {
+					containerId: containerInfo.Id,
+					error: (error as Error).message,
+				});
+			}
 
 			statusInfos.push({
 				container_id: containerInfo.Id.slice(0, 12),
